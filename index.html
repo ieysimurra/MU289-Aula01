@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A Jornada Sonora: Uma Exploração Interativa</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Retro Tech (inspired by Solarized Light) -->
+    <!-- Application Structure Plan: The application is designed as a single-page interactive dashboard with thematic sections (Timeline, Pioneers, Synthesis Techniques, Milestones, Exercises, References) accessible via a top navigation bar. This non-linear structure prioritizes user-driven exploration over a linear reading of the source report. For instance, a user interested in 'how sounds are made' can directly access the 'Techniques' section with its interactive diagrams and comparison charts. This is more effective for learning and engagement than a long text. Key interactions include a clickable timeline chart, a filterable gallery of pioneers revealing details in modals, and animated diagrams of synthesis methods, transforming the static report into a dynamic educational tool. New sections for Exercises (with toggleable answers) and References (detailed list) further enhance the learning experience. -->
+    <!-- Visualization & Content Choices: 
+        - Timeline (Goal: Change/Organize): A Chart.js line chart is used to present historical events. Interaction: Hover for details, click to scroll to related content. Justification: Most intuitive way to show historical progression interactively.
+        - Pioneers Gallery (Goal: Inform/Organize): An HTML/Tailwind card grid. Interaction: Click to open a modal with details. Justification: A visual gallery is more engaging than a text list; modals prevent UI clutter.
+        - Synthesis Technique Comparison (Goal: Compare): A Chart.js Radar Chart. Interaction: Toggles to compare different techniques. Justification: Excellent for multi-attribute comparison.
+        - Synthesis Technique Diagrams (Goal: Explain): Diagrams built with animated HTML/CSS. Interaction: Sliders to control parameters. Justification: More pedagogical for technical concepts than static images. Enhanced with more visual feedback.
+        - Tables (Goal: Organize/Inform): Direct HTML tables for detailed historical context, pioneer works, and technique comparisons. Justification: Provides structured, comprehensive data that complements the interactive charts and diagrams.
+        - Exercises (Goal: Test/Reinforce): HTML <details>/<summary> for toggleable questions and answers. Justification: Allows self-assessment and immediate feedback.
+        - References (Goal: Inform/Resource): HTML list for bibliography. Justification: Provides academic rigor and resources for further study.
+        - All choices adhere to the NO SVG/Mermaid constraint, using Canvas for charts and HTML/CSS for other visuals. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FDF6E3;
+            color: #586E75;
+        }
+        .nav-link {
+            transition: color 0.3s, border-bottom-color 0.3s;
+        }
+        .nav-link:hover, .nav-link.active {
+            color: #CB4B16;
+            border-bottom-color: #CB4B16;
+        }
+        .card {
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .modal-overlay {
+            transition: opacity 0.3s ease-in-out;
+        }
+        .modal-content {
+            transition: transform 0.3s ease-in-out;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 400px;
+            max-height: 50vh;
+        }
+        .section-title {
+            color: #073642;
+            border-bottom: 2px solid #2AA198;
+            padding-bottom: 0.5rem;
+        }
+        .btn-primary {
+            background-color: #268BD2;
+            color: #FDF6E3;
+            transition: background-color 0.3s;
+        }
+        .btn-primary:hover {
+            background-color: #2077B2;
+        }
+        .btn-secondary {
+            background-color: #859900;
+            color: #FDF6E3;
+            transition: background-color 0.3s;
+        }
+        .btn-secondary:hover {
+            background-color: #6C7D00;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1.5rem;
+            margin-bottom: 2rem;
+            background-color: #EEE8D5;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        th, td {
+            border: 1px solid #93A1A1;
+            padding: 0.75rem;
+            text-align: left;
+        }
+        th {
+            background-color: #073642;
+            color: #FDF6E3;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #FDF6E3;
+        }
+        details {
+            background-color: #EEE8D5;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        summary {
+            padding: 1rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: #073642;
+            list-style: none; /* Remove default arrow */
+        }
+        summary::-webkit-details-marker {
+            display: none; /* Remove default arrow for Webkit browsers */
+        }
+        summary:before {
+            content: '+ '; /* Custom plus sign */
+            margin-right: 0.5rem;
+            color: #CB4B16;
+        }
+        details[open] summary:before {
+            content: '- '; /* Custom minus sign when open */
+        }
+        .answer-content {
+            padding: 0 1rem 1rem 1rem;
+            border-top: 1px solid #93A1A1;
+            color: #586E75;
+        }
+        .waveform-display {
+            height: 60px;
+            background-color: #DCDCDC;
+            border-radius: 4px;
+            margin-top: 0.5rem;
+            position: relative;
+            overflow: hidden;
+        }
+        .wave {
+            position: absolute;
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(to right, #2AA198 0%, #2AA198 50%, transparent 50%, transparent 100%);
+            background-size: 20px 100%;
+            animation: pulse 1s infinite alternate;
+        }
+        .filtered-wave {
+            background: linear-gradient(to right, #2AA198 0%, #2AA198 20%, transparent 20%, transparent 100%);
+            background-size: 20px 100%;
+        }
+        @keyframes pulse {
+            0% { transform: scaleY(0.8); opacity: 0.7; }
+            100% { transform: scaleY(1.2); opacity: 1; }
+        }
+        .fm-oscillator {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #268BD2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            transition: all 0.2s ease-out;
+        }
+        .fm-connection {
+            width: 50px;
+            height: 2px;
+            background-color: #586E75;
+            margin: 0 10px;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Header & Navigation -->
+    <header class="bg-[#FDF6E3] sticky top-0 z-40 shadow-md">
+        <nav class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="text-2xl font-bold text-[#CB4B16]">
+                Jornada Sonora 🎹
+            </div>
+            <div class="hidden md:flex items-center space-x-6">
+                <a href="#inicio" class="nav-link border-b-2 border-transparent pb-1">Início</a>
+                <a href="#pioneiros" class="nav-link border-b-2 border-transparent pb-1">Pioneiros</a>
+                <a href="#tecnicas" class="nav-link border-b-2 border-transparent pb-1">Técnicas</a>
+                <a href="#marcos" class="nav-link border-b-2 border-transparent pb-1">Marcos</a>
+                <a href="#exercicios" class="nav-link border-b-2 border-transparent pb-1">Exercícios</a>
+                <a href="#referencias" class="nav-link border-b-2 border-transparent pb-1">Referências</a>
+            </div>
+            <button id="mobile-menu-button" class="md:hidden text-2xl">☰</button>
+        </nav>
+        <div id="mobile-menu" class="hidden md:hidden bg-[#EEE8D5] flex-col items-center py-4">
+            <a href="#inicio" class="block py-2">Início</a>
+            <a href="#pioneiros" class="block py-2">Pioneiros</a>
+            <a href="#tecnicas" class="block py-2">Técnicas</a>
+            <a href="#marcos" class="block py-2">Marcos</a>
+            <a href="#exercicios" class="block py-2">Exercícios</a>
+            <a href="#referencias" class="block py-2">Referências</a>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-6 py-12">
+        <!-- Section: Início -->
+        <section id="inicio" class="text-center min-h-screen flex flex-col justify-center items-center">
+            <h1 class="text-4xl md:text-6xl font-bold text-[#073642] mb-4">A Jornada da Síntese Sonora</h1>
+            <p class="text-lg md:text-xl max-w-3xl mx-auto mb-8">Uma exploração interativa da história, tecnologia e arte da música eletrônica. Descubra como o som foi esculpido, da pedra ao pixel.</p>
+            <div class="chart-container w-full mb-8">
+                <canvas id="timelineChart"></canvas>
+            </div>
+            <p class="mt-4 text-sm text-gray-500">Passe o mouse ou toque nos pontos para mais detalhes.</p>
+
+            <h3 class="section-title text-2xl font-bold text-center mt-16 mb-8">Linha do Tempo da Música Eletrônica e Síntese Sonora</h3>
+            <table class="w-full text-sm md:text-base">
+                <thead>
+                    <tr>
+                        <th>Ano/Período</th>
+                        <th>Evento/Instrumento/Movimento</th>
+                        <th>Principais Figuras</th>
+                        <th>Breve Descrição/Contribuição</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>1730</td><td>Denis D'or</td><td>Václav Prokop Diviš</td><td>Precursor incerto, teclado elétrico.</td></tr>
+                    <tr><td>1896</td><td>Telharmonium</td><td>Thaddeus Cahill</td><td>Primeiro instrumento eletromecânico, síntese aditiva.</td></tr>
+                    <tr><td>1920</td><td>Theremin</td><td>Léon Theremin</td><td>Música sem contato físico.</td></tr>
+                    <tr><td>1928</td><td>Ondes Martenot</td><td>Maurice Martenot</td><td>Expressividade e timbres variados.</td></tr>
+                    <tr><td>1948</td><td>Musique Concrète</td><td>Pierre Schaeffer</td><td>Manipulação de gravações, "sons encontrados".</td></tr>
+                    <tr><td>1951</td><td>Elektronische Musik</td><td>Meyer-Eppler, Eimert, Stockhausen</td><td>Síntese pura, sons gerados eletronicamente.</td></tr>
+                    <tr><td>1956</td><td>*Forbidden Planet* (trilha sonora)</td><td>Louis & Bebe Barron</td><td>Primeira trilha sonora eletrônica de filme.</td></tr>
+                    <tr><td>1958</td><td>BBC Radiophonic Workshop</td><td>Daphne Oram, Delia Derbyshire</td><td>Estúdio de experimentação sonora para rádio/TV.</td></tr>
+                    <tr><td>1967</td><td>*Silver Apples of the Moon*</td><td>Morton Subotnick</td><td>Primeira composição eletrônica para disco por gravadora clássica.</td></tr>
+                    <tr><td>1968</td><td>*Switched-On Bach*</td><td>Wendy Carlos</td><td>Popularização do sintetizador Moog, clássico eletrônico.</td></tr>
+                    <tr><td>1974</td><td>*Autobahn* (álbum)</td><td>Kraftwerk</td><td>Estilo "robot pop", influência global no eletrônico.</td></tr>
+                    <tr><td>1976</td><td>*Oxygène* (álbum)</td><td>Jean-Michel Jarre</td><td>Paisagens sonoras eletrônicas, popularização.</td></tr>
+                    <tr><td>1983</td><td>MIDI (especificação 1.0)</td><td>Colaboração de fabricantes</td><td>Linguagem universal para instrumentos eletrônicos.</td></tr>
+                    <tr><td>1983</td><td>Yamaha DX7</td><td>John Chowning (FM Synthesis)</td><td>Popularização da síntese FM.</td></tr>
+                    <tr><td>1986</td><td>Síntese Granular em tempo real</td><td>Barry Truax</td><td>Exploração do micro-som.</td></tr>
+                    <tr><td>1994</td><td>Yamaha VL1</td><td>Julius Smith (Modelagem Física)</td><td>Primeiro sintetizador comercial de modelagem física.</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Section: Pioneiros -->
+        <section id="pioneiros" class="py-20">
+            <h2 class="section-title text-3xl font-bold text-center mb-12">Pioneiros da Síntese Sonora</h2>
+            <p class="text-center max-w-3xl mx-auto mb-12">Esta seção apresenta os visionários que moldaram o universo da música eletrônica. De acadêmicos em laboratórios a artistas que popularizaram o gênero, suas contribuições foram fundamentais. Clique em cada um para descobrir sua história e obras marcantes.</p>
+            <div id="pioneers-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+                <!-- Pioneer cards will be injected here by JavaScript -->
+            </div>
+
+            <h3 class="section-title text-2xl font-bold text-center mt-16 mb-8">Pioneiros e Obras Marcantes da Música Eletrônica</h3>
+            <table class="w-full text-sm md:text-base">
+                <thead>
+                    <tr>
+                        <th>Compositor/Artista</th>
+                        <th>Obra(s) Representativa(s)</th>
+                        <th>Ano da Obra</th>
+                        <th>Contribuição Principal/Contexto</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>Pierre Schaeffer</td><td>*Concert de Bruits*, *Étude aux chemins de fer*</td><td>1948</td><td>Fundador da Música Concreta, manipulação de gravações.</td></tr>
+                    <tr><td>Karlheinz Stockhausen</td><td>*Gesang der Jünglinge*, *Studie I & II*</td><td>1955-56</td><td>Síntese pura, vocal e eletrônica, marco eletroacústico.</td></tr>
+                    <tr><td>Louis & Bebe Barron</td><td>*Forbidden Planet* (trilha sonora)</td><td>1956</td><td>Primeira trilha eletrônica de filme, síntese cibernética.</td></tr>
+                    <tr><td>Daphne Oram</td><td>Técnica Oramics, obras do BBC Radiophonic Workshop</td><td>1950s/60s</td><td>Pioneira do BBC Radiophonic Workshop, síntese visual.</td></tr>
+                    <tr><td>Wendy Carlos</td><td>*Switched-On Bach*</td><td>1968</td><td>Popularização do sintetizador Moog, clássico eletrônico.</td></tr>
+                    <tr><td>Morton Subotnick</td><td>*Silver Apples of the Moon*</td><td>1967</td><td>Primeira composição eletrônica para disco por gravadora clássica.</td></tr>
+                    <tr><td>Kraftwerk</td><td>*Autobahn*, *Trans-Europe Express*, *The Man-Machine*</td><td>1974, 1977, 1978</td><td>Estilo "robot pop", popularização do gênero, influência global.</td></tr>
+                    <tr><td>Jean-Michel Jarre</td><td>*Oxygène*</td><td>1976</td><td>Paisagens sonoras eletrônicas, popularização mundial.</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Section: Técnicas de Síntese -->
+        <section id="tecnicas" class="py-20 bg-[#EEE8D5] rounded-lg">
+            <h2 class="section-title text-3xl font-bold text-center mb-12">Decifrando as Técnicas de Síntese</h2>
+            <p class="text-center max-w-3xl mx-auto mb-12">A síntese sonora é a arte de criar som. Aqui, exploramos os métodos fundamentais que os músicos usam para construir timbres, desde a simplicidade da síntese subtrativa até a complexidade da modelagem física. Interaja com os diagramas para entender como cada técnica funciona.</p>
+            
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- Subtractive Synthesis -->
+                <div class="card bg-[#FDF6E3] p-6 rounded-lg shadow-lg">
+                    <h3 class="text-2xl font-bold text-[#268BD2] mb-4">Síntese Subtrativa</h3>
+                    <p class="mb-4">O método mais comum. Começa com uma onda rica em harmônicos (como uma onda quadrada ou dente de serra) e "esculpe" o som removendo frequências com um filtro.</p>
+                    <div class="relative h-32 bg-gray-100 rounded-md p-2 overflow-hidden">
+                        <p class="text-xs text-gray-500 mb-1">Onda original (rica em harmônicos):</p>
+                        <div class="waveform-display mb-4">
+                            <div class="wave" style="background-image: repeating-linear-gradient(90deg, #2AA198 0 5px, transparent 5px 10px);"></div>
+                        </div>
+                        <p class="text-xs text-gray-500 mb-1">Onda filtrada:</p>
+                        <div class="waveform-display">
+                            <div id="subtractive-filtered-wave" class="wave filtered-wave" style="background-image: repeating-linear-gradient(90deg, #CB4B16 0 5px, transparent 5px 10px);"></div>
+                        </div>
+                        <div id="subtractive-filter-visual" class="absolute top-1/2 left-0 h-full w-1/2 bg-blue-300 opacity-30" style="transform: translateY(-50%);"></div>
+                    </div>
+                    <label for="filter-slider" class="block mt-4">Corte do Filtro:</label>
+                    <input type="range" id="filter-slider" min="0" max="100" value="50" class="w-full">
+                </div>
+
+                <!-- FM Synthesis -->
+                <div class="card bg-[#FDF6E3] p-6 rounded-lg shadow-lg">
+                    <h3 class="text-2xl font-bold text-[#D33682] mb-4">Síntese FM</h3>
+                    <p class="mb-4">Gera timbres complexos, muitas vezes metálicos ou percussivos, modulando a frequência de uma onda (portadora) com outra (moduladora).</p>
+                    <div class="relative h-32 bg-gray-100 rounded-md p-2 flex items-center justify-center">
+                        <div id="fm-modulator-visual" class="fm-oscillator bg-[#D33682]">MOD</div>
+                        <div class="fm-connection"></div>
+                        <div id="fm-carrier-visual" class="fm-oscillator w-16 h-16 rounded-full bg-[#268BD2]">CAR</div>
+                        <div class="absolute bottom-2 text-xs text-gray-500">
+                            <span id="fm-mod-freq">Freq. Mod: 100Hz</span> | <span id="fm-car-freq">Freq. Car: 440Hz</span>
+                        </div>
+                    </div>
+                     <label for="fm-slider" class="block mt-4">Índice de Modulação:</label>
+                    <input type="range" id="fm-slider" min="0" max="100" value="20" class="w-full">
+                </div>
+                
+                <!-- Granular Synthesis -->
+                 <div class="card bg-[#FDF6E3] p-6 rounded-lg shadow-lg">
+                    <h3 class="text-2xl font-bold text-[#859900] mb-4">Síntese Granular</h3>
+                    <p class="mb-4">Cria texturas complexas ao decompor um som em minúsculos "grãos" (microsons) e reorganizá-los no tempo.</p>
+                    <div id="granular-container" class="h-32 bg-gray-100 rounded-md p-2 flex items-center justify-center space-x-1 overflow-hidden">
+                       <!-- Grains will be generated here -->
+                    </div>
+                    <label for="grain-slider" class="block mt-4">Densidade dos Grãos:</label>
+                    <input type="range" id="grain-slider" min="5" max="50" value="15" class="w-full">
+                </div>
+            </div>
+
+            <div class="mt-16">
+                 <h3 class="text-2xl font-bold text-center mb-8">Comparativo das Técnicas</h3>
+                 <div class="chart-container mx-auto" style="height: 450px; max-height: 60vh;">
+                     <canvas id="synthesisRadarChart"></canvas>
+                 </div>
+            </div>
+
+            <h3 class="section-title text-2xl font-bold text-center mt-16 mb-8">Técnicas de Síntese Sonora: Princípios e Aplicações</h3>
+            <table class="w-full text-sm md:text-base">
+                <thead>
+                    <tr>
+                        <th>Técnica de Síntese</th>
+                        <th>Princípio Básico</th>
+                        <th>Exemplos de Aplicação/Instrumentos</th>
+                        <th>Notas Chave</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>Síntese Aditiva</td><td>Soma de ondas simples (senoidais)</td><td>Telharmonium, Órgãos eletrônicos</td><td>Mais antiga, sons orgânicos (em teoria).</td></tr>
+                    <tr><td>Síntese Subtrativa</td><td>Filtragem de ondas complexas (ricas em harmônicos)</td><td>Sintetizadores Moog, ARP</td><td>Mais comum, filtros ressonantes, sons "quentes".</td></tr>
+                    <tr><td>Síntese FM (Frequency Modulation)</td><td>Modulação da frequência de uma onda por outra</td><td>Yamaha DX7, sintetizadores digitais</td><td>Timbres metálicos, percussivos, eficiência digital.</td></tr>
+                    <tr><td>Síntese Granular</td><td>Manipulação de pequenos "grãos" de som (microsons)</td><td>Composições de Xenakis, Roads, Truax; *software*</td><td>Texturas complexas, manipulação temporal, esticamento de tempo.</td></tr>
+                    <tr><td>Síntese por Modelagem Física</td><td>Simulação de propriedades físicas de instrumentos</td><td>Yamaha VL1, instrumentos virtuais (cordas, tubos)</td><td>Realismo, parâmetros intuitivos, simulação de comportamento.</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Section: Marcos -->
+        <section id="marcos" class="py-20">
+            <h2 class="section-title text-3xl font-bold text-center mb-12">Marcos e Inovações</h2>
+            <p class="text-center max-w-3xl mx-auto mb-12">Alguns instrumentos, álbuns e tecnologias não apenas definiram sua época, mas mudaram para sempre o curso da música. Esta seção destaca esses marcos, desde a popularização do sintetizador Moog até a linguagem universal do MIDI.</p>
+            <div id="milestones-grid" class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- Milestone cards will be injected here -->
+            </div>
+             <div class="mt-16 text-center">
+                <img src="https://placehold.co/800x300/FDF6E3/073642?text=Diagrama+de+Fluxo+MIDI" alt="Diagrama de Fluxo MIDI" class="mx-auto rounded-lg shadow-md max-w-full h-auto">
+                <p class="text-sm text-gray-500 mt-2">Um diagrama simplificado do fluxo de dados MIDI: do controlador ao sintetizador.</p>
+            </div>
+        </section>
+
+        <!-- Section: Exercícios de Fixação -->
+        <section id="exercicios" class="py-20 bg-[#EEE8D5] rounded-lg">
+            <h2 class="section-title text-3xl font-bold text-center mb-12">Exercícios de Fixação</h2>
+            <p class="text-center max-w-3xl mx-auto mb-12">Teste seus conhecimentos sobre a síntese sonora e a música eletrônica. Clique nas perguntas para revelar as respostas e comentários.</p>
+            
+            <div class="max-w-3xl mx-auto">
+                <details>
+                    <summary>1. Resuma a definição de síntese sonora e sua importância para a música contemporânea.</summary>
+                    <div class="answer-content">
+                        <p><strong>Chave de Resposta:</strong> A síntese sonora é a arte e ciência de criar e manipular sons utilizando recursos eletrônicos e computacionais. Sua importância reside na capacidade de expandir o universo sonoro e expressivo da música, permitindo a criação de timbres inéditos e a transformação radical de sons preexistentes, indo além das limitações dos instrumentos acústicos.</p>
+                        <p class="text-sm text-gray-600 mt-2"><em>Comentário:</em> Um bom resumo deve abordar a ideia de criação/manipulação de som por meios eletrônicos/computacionais, a expansão do universo sonoro, a distinção de instrumentos acústicos e a relevância para a música atual. Deve demonstrar compreensão dos conceitos de geração e processamento.</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>2. Quais são as principais diferenças filosóficas e técnicas entre a *Musique Concrète* e a *Elektronische Musik*? Qual abordagem dos Barrons se alinha mais com qual dessas escolas, e por quê?</summary>
+                    <div class="answer-content">
+                        <p><strong>Chave de Resposta:</strong>
+                        <ul>
+                            <li><strong>Musique Concrète (Pierre Schaeffer):</strong> Focada na manipulação de "sons encontrados" (gravados do mundo real). Busca a "escuta reduzida", abstraindo a fonte do som.</li>
+                            <li><strong>Elektronische Musik (Karlheinz Stockhausen):</strong> Focada na criação de sons puramente eletrônicos, gerados do zero por osciladores. Busca o controle total sobre cada parâmetro do som.</li>
+                        </ul>
+                        A abordagem dos Barrons, com sua manipulação de circuitos eletrônicos para criar sons "vivos" e imprevisíveis para *Forbidden Planet*, se alinha mais com a *Elektronische Musik* no sentido de que eles estavam gerando sons eletrônicos, não manipulando gravações do mundo real. No entanto, sua aceitação da imprevisibilidade e da "vida" dos circuitos também tem um toque de "descoberta" que lembra a *Musique Concrète* e a exploração de sons não-tradicionais.</p>
+                        <p class="text-sm text-gray-600 mt-2"><em>Comentário:</em> A resposta deve destacar a origem do material sonoro (gravado vs. gerado) e a filosofia de controle vs. descoberta. A conexão com os Barrons deve ser justificada pela fonte do som (eletrônica) e a natureza experimental (imprevisível).</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>3. Quais as vantagens e desvantagens da Síntese FM em comparação com a Síntese Subtrativa?</summary>
+                    <div class="answer-content">
+                        <p><strong>Chave de Resposta:</strong>
+                        <ul>
+                            <li><strong>Síntese FM:</strong> Vantagens: Capaz de gerar timbres complexos (metálicos, percussivos, sinos, pianos elétricos) com poucos osciladores, o que a tornava muito eficiente digitalmente em um período de poder computacional limitado. Desvantagens: Pode ser menos intuitiva de programar para iniciantes, e seus timbres tendem a ser mais "digitais" ou "frios" em comparação com a subtrativa.</li>
+                            <li><strong>Síntese Subtrativa:</strong> Vantagens: Mais intuitiva (começa com som rico e "esculpe"), produz timbres "quentes" e orgânicos, muito versátil para sons de *pads*, baixos e *leads*. Desvantagens: Menos eficiente para certos timbres muito complexos que a FM pode gerar facilmente, e pode exigir mais recursos (osciladores, filtros) para complexidade.</li>
+                        </ul></p>
+                        <p class="text-sm text-gray-600 mt-2"><em>Comentário:</em> A resposta deve focar nas características sonoras e na complexidade de programação/eficiência de cada técnica, demonstrando compreensão de seus princípios.</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>4. Qual a importância do MIDI na produção musical moderna e como ele difere do áudio digital?</summary>
+                    <div class="answer-content">
+                        <p><strong>Chave de Resposta:</strong> O MIDI (Musical Instrument Digital Interface) é uma linguagem universal que permite que instrumentos eletrônicos se comuniquem e sincronizem. Sua importância reside na flexibilidade que oferece: permite o controle remoto de parâmetros, a edição não-destrutiva de performances, a composição algorítmica e a integração de diversos dispositivos. Ele difere do áudio digital porque o MIDI transmite *dados de performance* (qual nota, com que força, etc.), resultando em arquivos pequenos e altamente editáveis. O áudio digital, por outro lado, é a *gravação do som real*, resultando em arquivos maiores e menor flexibilidade para edição de parâmetros musicais após a gravação.</p>
+                        <p class="text-sm text-gray-600 mt-2"><em>Comentário:</em> A resposta deve cobrir a função do MIDI como protocolo de comunicação, suas vantagens práticas na produção e a distinção fundamental entre "dados de performance" e "som gravado".</p>
+                    </div>
+                </details>
+            </div>
+        </section>
+
+        <!-- Section: Referências Bibliográficas -->
+        <section id="referencias" class="py-20">
+            <h2 class="section-title text-3xl font-bold text-center mb-12">Referências Bibliográficas Essenciais</h2>
+            <p class="text-center max-w-3xl mx-auto mb-12">Para aprofundar seus estudos, consulte esta lista de referências clássicas e atuais no campo da música eletrônica e síntese sonora.</p>
+            
+            <div class="max-w-3xl mx-auto text-sm md:text-base">
+                <h3 class="font-bold text-xl text-[#073642] mb-4">Livros e Artigos Acadêmicos:</h3>
+                <ul class="list-disc list-inside space-y-2">
+                    <li>Fritsch, Eloy F. *Música Eletrônica, Uma Introdução Ilustrada*. 2. ed. UFRGS, [Ano de Publicação].</li>
+                    <li>Hiller, L.; Ruiz, P. "Synthesizing Musical Sounds by Solving the Wave Equation for Vibrating Objects". *Journal of the Audio Engineering Society*, 1971.</li>
+                    <li>Karplus, K.; Strong, A. "Digital synthesis of plucked string and drum timbres". *Computer Music Journal*, 7(2): 43–55, 1983.</li>
+                    <li>Miranda, E. R. *Computer Sound Design: Synthesis Techniques and Programming*. Oxford: Focal Press, 2002.</li>
+                    <li>Roads, Curtis. *The Computer Music Tutorial*. Cambridge: The MIT Press, 1996.</li>
+                    <li>Roads, Curtis. *Microsound*. Cambridge: MIT Press, 2001.</li>
+                    <li>Smith III, Julius O. "A Basic Introduction to Digital Waveguide Synthesis". Disponível em: [http://www.cirmmt.mcgill.ca/activities/distinguished-lectures/smith-slides](http://www.cirmmt.mcgill.ca/activities/distinguished-lectures/smith-slides).</li>
+                    <li>Truax, Barry. "Real-Time Granular Synthesis with a Digital Signal Processor". *Computer Music Journal*, 12(2): 14–26, 1988.</li>
+                    <li>Xenakis, Iannis. *Formalized Music: Thought and Mathematics in Composition*. Bloomington and London: Indiana University Press, 1971.</li>
+                </ul>
+
+                <h3 class="font-bold text-xl text-[#073642] mt-8 mb-4">Recursos Online e Artigos de Periódicos:</h3>
+                <ul class="list-disc list-inside space-y-2">
+                    <li>Apple Music Classical. "Karlheinz Stockhausen". Disponível em: [https://classical.music.apple.com/pt/artist/51221406](https://classical.music.apple.com/pt/artist/51221406).</li>
+                    <li>Boomkat.com. "Morton Subotnick - Silver Apples Of The Moon (Remastered Reissue)". Disponível em: [https://boomkat.com/products/silver-apples-of-the-moon-remastered-reissue](https://boomkat.com/products/silver-apples-of-the-moon-remastered-reissue).</li>
+                    <li>CuadernilloDeMusica.blogspot.com. "Música Concreta y Electrónica". Disponível em: [https://cuadernillodemusica.blogspot.com/2017/06/musica-concreta-y-electronica.html](https://cuadernillodemusica.blogspot.com/2017/06/musica-concreta-y-electronica.html).</li>
+                    <li>EBSCO.com. "Switched-on Bach (music)". Disponível em: [https://www.ebsco.com/research-starters/music/switched-bach-music](https://www.ebsco.com/research-starters/music/switched-bach-music).</li>
+                    <li>Electronics.howstuffworks.com. "How Theremins Work". Disponível em: [https://electronics.howstuffworks.com/gadgets/audio-music/theremin.htm](https://electronics.howstuffworks.com/gadgets/audio-music/theremin.htm).</li>
+                    <li>Fiveable.me. "MIDI Technology". Disponível em:(https://library.fiveable.me/music-of-the-modern-era/unit-4/midi-technology/study-guide/wCsoprZhvbevMSma).</li>
+                    <li>LoudCave.es. "Legado musical: Pierre Schaeffer y música concreta". Disponível em: [https://loudcave.es/musica-concreta/](https://loudcave.es/musica-concreta/).</li>
+                    <li>MusicaBrasileira.webnode.com.br. "Música Eletrônica". Disponível em: [https://musicabrasileira.webnode.com.br/estilos-musicais-brasileiros/musica-eletronica/](https://musicabrasileira.webnode.com.br/estilos-musicais-brasileiros/musica-eletronica/).</li>
+                    <li>NovoAnhangabau.com.br. "A história da música eletrônica: do século XVIII ao Novo Anhangabaú - Parte 1". Disponível em: [https://www.novoanhangabau.com.br/blog/a-historia-da-musica-eletronica-do-seculo-xviii-ao-novo-anhangabau---parte-1](https://www.novoanhangabau.com.br/blog/a-historia-da-musica-eletronica-do-seculo-xviii-ao-novo-anhangabau---parte-1).</li>
+                    <li>OpenCulture.com. "Meet the Telharmonium, the First Synthesizer". Disponível em: [https://www.openculture.com/2016/01/meet-the-telharmonium-the-first-synthesizer.html](https://www.openculture.com/2016/01/meet-the-telharmonium-the-first-synthesizer.html).</li>
+                    <li>PerfectCircuit.com. "Ondes Martenot History". Disponível em: [https://www.perfectcircuit.com/signal/ondes-martenot-history](https://www.perfectcircuit.com/signal/ondes-martenot-history).</li>
+                    <li>ProducerTech.com. "Pioneers of Digital Music: Daphne Oram". Disponível em: [https://www.producertech.com/blog/pioneers-of-digital-music-daphne-oram](https://www.producertech.com/blog/pioneers-of-digital-music-daphne-oram).</li>
+                    <li>Reaktorplayer.wordpress.com. "Daphne Oram And Delia Derbyshire: The BBC Radiophonic Workshop Gallery". Disponível em: [https://reaktorplayer.wordpress.com/2013/01/05/daphne-oram-and-delia-derbyshire-the-bbc-radiophonic-workshop-gallery/](https://reaktorplayer.wordpress.com/2013/01/05/daphne-oram-and-delia-derbyshire-the-bbc-radiophonic-workshop-gallery/).</li>
+                    <li>SFU.ca. "Granular Synthesis". Disponível em: [https://www.sfu.ca/~truax/gran.html](https://www.sfu.ca/~truax/gran.html).</li>
+                    <li>SoundWorksCollection.com. "Creating the Music and Sound Effects of Forbidden Planet". Disponível em: [https://soundworkscollection.com/news/creating-the-music-and-sound-effects-of-forbidden-planet](https://soundworkscollection.com/news/creating-the-music-and-sound-effects-of-forbidden-planet).</li>
+                    <li>Tang.skidmore.edu. "Morton Subotnick: Silver Apples of the Moon". Disponível em: [https://tang.skidmore.edu/exhibitions/29-elevator-music-28-morton-subotnick-silver-apples-of-the-moon](https://tang.skidmore.edu/exhibitions/29-elevator-music-28-morton-subotnick-silver-apples-of-the-moon).</li>
+                    <li>Trajdash.usc.edu. "Switched-On Bach". Disponível em: [https://trajdash.usc.edu/switched-on-bach](https://trajdash.usc.edu/switched-on-bach).</li>
+                    <li>Tuntistun.com.br. "Música Eletrônica: História da Evolução da Arte do Ruído". Disponível em: [https://www.tuntistun.com.br/musica-eletronica-historia-da-evolucao-da-arte-do-ruido/](https://www.tuntistun.com.br/musica-eletronica-historia-da-evolucao-da-arte-do-ruido/).</li>
+                    <li>UndergroundTalent.co.uk. "Kraftwerk". Disponível em: [https://undergroundtalent.co.uk/kraftwerk/](https://undergroundtalent.co.uk/kraftwerk/).</li>
+                    <li>Unibo.it. "Sound Synthesis and Physical Modelling". Disponível em: [https://site.unibo.it/nemus-numerical-sound-restoration/en/project/sound-synthesis-and-physical-modelling](https://site.unibo.it/nemus-numerical-sound-restoration/en/project/sound-synthesis-and-physical-modelling).</li>
+                    <li>UFRGS.br. "Karlheinz Stockhausen - Gesang der Jünglinge". Disponível em: [https://www.ufrgs.br/mvs/Periodo02-1950-GesangderJunglinge.html](https://www.ufrgs.br/mvs/Periodo02-1950-GesangderJunglinge.html).</li>
+                    <li>UFRGS.br. "Publicações - Música Eletrônica, Uma Introdução Ilustrada". Disponível em: [https://www.ufrgs.br/musicaeletronica/index.php/publicacoes/](https://www.ufrgs.br/musicaeletronica/index.php/publicacoes/).</li>
+                    <li>VoltageControl.blog. "Jean-Michel Jarre's "Oxygène": A Pioneering Masterpiece of Electronic Music". Disponível em: [https://www.voltagecontrol.blog/jean-michel-jarres-oxygene-a-pioneering-masterpiece-of-electronic-music/](https://www.voltagecontrol.blog/jean-michel-jarres-oxygene-a-pioneering-masterpiece-of-electronic-music/).</li>
+                    <li>Wikipedia. "Bebe and Louis Barron". Disponível em:(https://en.wikipedia.org/wiki/Bebe_and_Louis_Barron).</li>
+                    <li>Wikipedia. "Granular synthesis". Disponível em: [https://en.wikipedia.org/wiki/Granular_synthesis](https://en.wikipedia.org/wiki/Granular_synthesis).</li>
+                    <li>Wikipedia. "Kraftwerk". Disponível em: [https://en.wikipedia.org/wiki/Kraftwerk](https://en.wikipedia.org/wiki/Kraftwerk).</li>
+                    <li>Wikipedia. "MIDI". Disponível em:([https://en.wikipedia.org/wiki/MIDI](https://en.wikipedia.org/wiki/MIDI)).</li>
+                    <li>Wikipedia. "Música eletrônica". Disponível em:(https://pt.wikipedia.org/wiki/M%C3%BAsica_eletr%C3%B4nica).</li>
+                    <li>Wikipedia. "Ondes Martenot". Disponível em: [https://www.britannica.com/art/ondes-martenot](https://www.britannica.com/art/ondes-martenot).</li>
+                    <li>Wikipedia. "Physical modelling synthesis". Disponível em: [https://en.wikipedia.org/wiki/Physical_modelling_synthesis](https://en.wikipedia.org/wiki/Physical_modelling_synthesis).</li>
+                    <li>Wikipedia. "Telharmonium". Disponível em:([https://en.wikipedia.org/wiki/Telharmonium](https://en.wikipedia.org/wiki/Telharmonium)).</li>
+                    <li>Wikipedia. "Theremin". Disponível em:(https://en.wikipedia.org/wiki/Theremin).</li>
+                    <li>YouTube. "Jean Michel Jarre Oxygene". Disponível em: [https://www.youtube.com/watch?v=3wlpmqmLOjk](https://www.youtube.com/watch?v=3wlpmqmLOjk).</li>
+                    <li>YouTube. "Louis & Bebe Barron - Forbidden Planet : Main Titles Overture". Disponível em: [https://www.youtube.com/watch?v=qj6lUC6K4VQ](https://www.youtube.com/watch?v=qj6lUC6K4VQ).</li>
+                    <li>YouTube. "Sound synthesis based on physical models - CIRMMT Distinguished Lectures in the Science and Technology of Music". Disponível em: [https://www.youtube.com/watch?v=dUcNzPhZdwk](https://www.youtube.com/watch?v=dUcNzPhZdwk).</li>
+                    <li>YouTube. "The Theremin is the coolest instrument in the world". Disponível em:(https://www.youtube.com/watch?v=-QgTF8p-284&pp=0gcJCf0Ao7VqN5tD).</li>
+                    <li>YouTube. "Yamaha DX7". Disponível em: [https://www.youtube.com/watch?v=sXt_NXjc7oY](https://www.youtube.com/watch?v=sXt_NXjc7oY).</li>
+                </ul>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-[#EEE8D5] text-center py-6">
+        <p>Uma exploração interativa baseada no material de aula sobre Síntese Sonora.</p>
+        <p class="text-sm text-gray-600 mt-2">Criado com paixão por tecnologia e música.</p>
+    </footer>
+
+    <!-- Modal Structure -->
+    <div id="modal-container" class="modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 opacity-0 pointer-events-none">
+        <div id="modal-content" class="modal-content bg-[#FDF6E3] rounded-lg shadow-2xl max-w-2xl w-full p-8 max-h-[90vh] overflow-y-auto transform scale-95">
+             <button id="modal-close" class="absolute top-4 right-4 text-2xl font-bold">&times;</button>
+             <h3 id="modal-title" class="text-3xl font-bold text-[#CB4B16] mb-4"></h3>
+             <img id="modal-image" src="" alt="" class="w-full h-64 object-cover rounded-lg mb-6" onerror="this.style.display='none'">
+             <div id="modal-body" class="prose max-w-none"></div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // Mobile Menu
+            const mobileMenuButton = document.getElementById('mobile-menu-button');
+            const mobileMenu = document.getElementById('mobile-menu');
+            mobileMenuButton.addEventListener('click', () => {
+                mobileMenu.classList.toggle('hidden');
+            });
+
+            // Smooth Scrolling & Active Nav Link
+            const navLinks = document.querySelectorAll('a[href^="#"]');
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    let target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        window.scrollTo({
+                            top: target.offsetTop - 80,
+                            behavior: 'smooth'
+                        });
+                        if (mobileMenu.classList.contains('flex')) {
+                            mobileMenu.classList.add('hidden');
+                        }
+                    }
+                });
+            });
+
+            const sections = document.querySelectorAll('section');
+            window.addEventListener('scroll', () => {
+                let current = '';
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    if (pageYOffset >= sectionTop - 100) {
+                        current = section.getAttribute('id');
+                    }
+                });
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href').substring(1) === current) {
+                        link.classList.add('active');
+                    }
+                });
+            });
+
+
+            // Data
+            const timelineData = {
+                labels: ['1730', '1896', '1920', '1928', '1948', '1951', '1956', '1968', '1974', '1976', '1983', '1994'],
+                datasets: [{
+                    label: 'Marcos Históricos',
+                    data: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(y => y + Math.random() * 2 - 1),
+                    borderColor: '#268BD2',
+                    backgroundColor: '#CB4B16',
+                    fill: false,
+                    tension: 0.4,
+                    pointRadius: 6,
+                    pointHoverRadius: 10,
+                }]
+            };
+            const eventDescriptions = [
+                'Denis D\'or: Um dos primeiros teclados elétricos.',
+                'Telharmonium: Primeiro instrumento eletromecânico para síntese aditiva.',
+                'Theremin: Tocado sem contato físico, revolucionou a performance.',
+                'Ondes Martenot: Expressividade com controle de pitch e vibrato.',
+                'Musique Concrète: Pierre Schaeffer manipula sons gravados.',
+                'Elektronische Musik: O Estúdio de Colônia cria sons puramente eletrônicos.',
+                'Forbidden Planet: Primeira trilha sonora totalmente eletrônica por Louis & Bebe Barron.',
+                'Switched-On Bach: Wendy Carlos populariza o Moog.',
+                'Kraftwerk - Autobahn: O "robot pop" ganha o mundo.',
+                'Jean-Michel Jarre - Oxygène: Paisagens sonoras eletrônicas massificadas.',
+                'MIDI & Yamaha DX7: A revolução digital com a síntese FM e um padrão universal.',
+                'Yamaha VL1: A síntese por modelagem física se torna comercial.'
+            ];
+
+            const pioneersData = [
+                { id: 'schaeffer', name: 'Pierre Schaeffer', era: '1940s-50s', image: 'https://placehold.co/400x400/2AA198/FDF6E3?text=Schaeffer', desc: 'Pai da <strong>Musique Concrète</strong>. Em vez de criar sons do zero, Schaeffer revolucionou a música ao usar gravações de sons do mundo real (trens, portas, vozes) como matéria-prima para suas composições. Sua técnica de "escuta reduzida" nos ensina a ouvir o som por suas qualidades intrínsecas, independentemente de sua fonte.' },
+                { id: 'stockhausen', name: 'Karlheinz Stockhausen', era: '1950s-70s', image: 'https://placehold.co/400x400/D33682/FDF6E3?text=Stockhausen', desc: 'Figura central da <strong>Elektronische Musik</strong>. Ao contrário de Schaeffer, Stockhausen focou na criação de sons puramente eletrônicos, gerados por osciladores. Sua obra <em>Gesang der Jünglinge</em> é um marco, combinando a voz humana processada com sons sintetizados, unindo os mundos concreto e eletrônico.' },
+                { id: 'carlos', name: 'Wendy Carlos', era: '1960s-70s', image: 'https://placehold.co/400x400/CB4B16/FDF6E3?text=Carlos', desc: 'Popularizou o sintetizador Moog com seu álbum <strong>Switched-On Bach</strong> (1968). Ao recriar obras de Bach com timbres eletrônicos, Carlos provou que a música eletrônica podia ser musicalmente complexa, expressiva e comercialmente viável, levando o sintetizador dos laboratórios para o público em geral.' },
+                { id: 'kraftwerk', name: 'Kraftwerk', era: '1970s-80s', image: 'https://placehold.co/400x400/6C71C4/FDF6E3?text=Kraftwerk', desc: 'Pioneiros do "robot pop" e uma das bandas mais influentes de todos os tempos. Com álbuns como <em>Autobahn</em> e <em>The Man-Machine</em>, eles criaram uma estética minimalista e futurista, combinando melodias pop com ritmos mecânicos e vocoders. Sua influência se estende do hip hop ao techno.' },
+                { id: 'barron', name: 'Louis & Bebe Barron', era: '1950s', image: 'https://placehold.co/400x400/859900/FDF6E3?text=Barrons', desc: 'O casal por trás da primeira trilha sonora totalmente eletrônica para um filme, <strong>Forbidden Planet</strong> (1956). Eles não usavam sintetizadores convencionais, mas sim circuitos eletrônicos que eles mesmos construíam e sobrecarregavam para criar sons "vivos" e imprevisíveis, tratando os circuitos como "atores".' },
+                { id: 'jarre', name: 'Jean-Michel Jarre', era: '1970s-Hoje', image: 'https://placehold.co/400x400/B58900/FDF6E3?text=Jarre', desc: 'Mestre das paisagens sonoras eletrônicas. Seu álbum <strong>Oxygène</strong> (1976) foi um fenômeno global, caracterizado por melodias arrebatadoras, texturas etéreas e o uso inovador de sequenciadores e sintetizadores analógicos. Jarre é conhecido por seus concertos espetaculares para multidões massivas.' },
+                 { id: 'subotnick', name: 'Morton Subotnick', era: '1960s', image: 'https://placehold.co/400x400/268BD2/FDF6E3?text=Subotnick', desc: 'Compositor vanguardista que colaborou com Don Buchla no desenvolvimento do sintetizador Buchla. Sua obra <strong>Silver Apples of the Moon</strong> (1967) foi a primeira peça de música eletrônica encomendada por uma grande gravadora para ser lançada em disco, explorando ritmos e texturas que iam além das recriações clássicas.' },
+                 { id: 'oram', name: 'Daphne Oram', era: '1950s-60s', image: 'https://placehold.co/400x400/DC322F/FDF6E3?text=Oram', desc: 'Co-fundadora do visionário <strong>BBC Radiophonic Workshop</strong> e inventora da técnica <strong>Oramics</strong>, um método pioneiro de síntese gráfica onde o som era desenhado em filme. Ela foi uma figura central na exploração de novas paisagens sonoras para rádio e televisão, uma verdadeira pioneira do sound design.' },
+            ];
+
+            const milestonesData = [
+                { title: 'Sintetizador Moog', image: 'https://placehold.co/600x400/268BD2/FDF6E3?text=Moog', desc: 'Desenvolvido por Robert Moog nos anos 60, seu sistema modular e a popularização da síntese subtrativa tornaram o sintetizador um instrumento musical acessível e expressivo. Foi imortalizado por Wendy Carlos em "Switched-On Bach".' },
+                { title: 'Yamaha DX7 & Síntese FM', image: 'https://placehold.co/600x400/D33682/FDF6E3?text=DX7', desc: 'Lançado em 1983, o DX7 foi um fenômeno. Usando a síntese por modulação de frequência (FM) desenvolvida por John Chowning, ele produzia sons cristalinos e metálicos que definiram a música pop dos anos 80. Era digital, mais acessível e muito diferente dos sons "quentes" dos sintetizadores analógicos.' },
+                { title: 'MIDI 1.0', image: 'https://placehold.co/600x400/859900/FDF6E3?text=MIDI', desc: 'Também de 1983, o MIDI (Musical Instrument Digital Interface) foi uma revolução. Criou uma linguagem universal que permitia que instrumentos de diferentes fabricantes se comunicassem. Ele não transmite áudio, mas sim dados de performance (qual nota, com que força, etc.), permitindo a edição e o controle sem precedentes na produção musical.' }
+            ];
+
+            // Render Pioneers
+            const pioneersGrid = document.getElementById('pioneers-grid');
+            pioneersData.forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'card bg-[#EEE8D5] p-4 rounded-lg text-center cursor-pointer';
+                card.innerHTML = `
+                    <img src="${p.image}" alt="Retrato de ${p.name}" class="w-32 h-32 rounded-full mx-auto mb-4 object-cover" onerror="this.src='https://placehold.co/400x400/93A1A1/FDF6E3?text=Erro'">
+                    <h3 class="text-xl font-bold text-[#073642]">${p.name}</h3>
+                    <p class="text-sm text-[#CB4B16]">${p.era}</p>
+                `;
+                card.addEventListener('click', () => openModal(p));
+                pioneersGrid.appendChild(card);
+            });
+
+            // Render Milestones
+            const milestonesGrid = document.getElementById('milestones-grid');
+            milestonesData.forEach(m => {
+                const card = document.createElement('div');
+                card.className = 'card bg-[#EEE8D5] rounded-lg overflow-hidden shadow-lg';
+                card.innerHTML = `
+                    <img src="${m.image}" alt="${m.title}" class="w-full h-48 object-cover" onerror="this.src='https://placehold.co/600x400/93A1A1/FDF6E3?text=Erro'">
+                    <div class="p-6">
+                        <h3 class="text-2xl font-bold text-[#073642] mb-2">${m.title}</h3>
+                        <p>${m.desc}</p>
+                    </div>
+                `;
+                milestonesGrid.appendChild(card);
+            });
+
+            // Modal Logic
+            const modalContainer = document.getElementById('modal-container');
+            const modalContent = document.getElementById('modal-content');
+            const modalClose = document.getElementById('modal-close');
+            const modalTitle = document.getElementById('modal-title');
+            const modalImage = document.getElementById('modal-image');
+            const modalBody = document.getElementById('modal-body');
+
+            function openModal(pioneer) {
+                modalTitle.textContent = pioneer.name;
+                modalImage.src = pioneer.image;
+                modalImage.alt = `Retrato de ${pioneer.name}`;
+                modalImage.style.display = 'block';
+                modalBody.innerHTML = pioneer.desc;
+                modalContainer.classList.remove('opacity-0', 'pointer-events-none');
+                modalContent.classList.remove('scale-95');
+            }
+
+            function closeModal() {
+                modalContainer.classList.add('opacity-0', 'pointer-events-none');
+                modalContent.classList.add('scale-95');
+            }
+            modalClose.addEventListener('click', closeModal);
+            modalContainer.addEventListener('click', (e) => {
+                if(e.target === modalContainer) closeModal();
+            });
+
+
+            // Chart.js Timeline
+            const ctxTimeline = document.getElementById('timelineChart').getContext('2d');
+            new Chart(ctxTimeline, {
+                type: 'line',
+                data: timelineData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return eventDescriptions[context.dataIndex];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { display: false },
+                        x: {
+                            grid: { color: 'rgba(88, 110, 117, 0.1)' },
+                            ticks: { color: '#586E75' }
+                        }
+                    }
+                }
+            });
+
+            // Synthesis Techniques Animations
+            const filterSlider = document.getElementById('filter-slider');
+            const subtractiveFilteredWave = document.getElementById('subtractive-filtered-wave');
+            const subtractiveFilterVisual = document.getElementById('subtractive-filter-visual');
+
+            filterSlider.addEventListener('input', (e) => {
+                const filterValue = parseInt(e.target.value);
+                // Adjust the background-image to simulate filtering
+                // Lower value = more filtering (less of the original wave shows)
+                const percentage = filterValue; // 0-100
+                subtractiveFilteredWave.style.backgroundImage = `repeating-linear-gradient(90deg, #CB4B16 0 ${percentage}px, transparent ${percentage}px 100px)`;
+                subtractiveFilterVisual.style.width = `${100 - percentage}%`;
+                subtractiveFilterVisual.style.left = `${percentage}%`;
+            });
+            filterSlider.dispatchEvent(new Event('input')); // Initialize
+
+
+            const fmSlider = document.getElementById('fm-slider');
+            const fmModulatorVisual = document.getElementById('fm-modulator-visual');
+            const fmCarrierVisual = document.getElementById('fm-carrier-visual');
+            const fmModFreq = document.getElementById('fm-mod-freq');
+            const fmCarFreq = document.getElementById('fm-car-freq');
+
+            fmSlider.addEventListener('input', (e) => {
+                const intensity = parseInt(e.target.value); // 0-100
+                const modFreq = 100 + intensity * 2; // Modulator frequency changes
+                const carrierScale = 1 + (intensity / 100) * 0.5; // Carrier visual changes scale
+                const carrierRotation = (intensity / 100) * 360; // Carrier visual rotates
+
+                fmModulatorVisual.style.transform = `scale(${1 + (intensity / 100) * 0.2})`;
+                fmCarrierVisual.style.transform = `scale(${carrierScale}) rotate(${carrierRotation}deg)`;
+
+                fmModFreq.textContent = `Freq. Mod: ${modFreq.toFixed(0)}Hz`;
+                fmCarFreq.textContent = `Freq. Car: 440Hz (Modulado)`;
+            });
+            fmSlider.dispatchEvent(new Event('input')); // Initialize
+
+
+            const grainSlider = document.getElementById('grain-slider');
+            const granularContainer = document.getElementById('granular-container');
+            function generateGrains() {
+                granularContainer.innerHTML = '';
+                const count = parseInt(grainSlider.value);
+                for(let i=0; i < count; i++) {
+                    const grain = document.createElement('div');
+                    grain.className = 'bg-[#859900] rounded-sm';
+                    grain.style.width = `${Math.random() * 10 + 2}px`;
+                    grain.style.height = `${Math.random() * 40 + 10}px`;
+                    grain.style.opacity = Math.random() * 0.5 + 0.5;
+                    granularContainer.appendChild(grain);
+                }
+            }
+            grainSlider.addEventListener('input', generateGrains);
+            generateGrains();
+
+
+            // Chart.js Radar Chart
+            const ctxRadar = document.getElementById('synthesisRadarChart').getContext('2d');
+            new Chart(ctxRadar, {
+                type: 'radar',
+                data: {
+                    labels: ['Complexidade', 'CPU/Custo', 'Realismo Acústico', 'Timbre Metálico', 'Timbre "Quente"', 'Controle'],
+                    datasets: [
+                        { label: 'Subtrativa', data: [2, 2, 3, 2, 9, 8], fill: true, backgroundColor: 'rgba(38, 139, 210, 0.2)', borderColor: '#268BD2', pointBackgroundColor: '#268BD2' },
+                        { label: 'FM', data: [7, 4, 5, 9, 2, 5], fill: true, backgroundColor: 'rgba(211, 54, 130, 0.2)', borderColor: '#D33682', pointBackgroundColor: '#D33682' },
+                        { label: 'Granular', data: [8, 8, 4, 3, 3, 7], fill: true, backgroundColor: 'rgba(133, 153, 0, 0.2)', borderColor: '#859900', pointBackgroundColor: '#859900' },
+                        { label: 'Modelagem Física', data: [10, 9, 9, 6, 7, 9], fill: true, backgroundColor: 'rgba(203, 75, 22, 0.2)', borderColor: '#CB4B16', pointBackgroundColor: '#CB4B16' }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { color: '#586E75' } },
+                        tooltip: { mode: 'index', intersect: false }
+                    },
+                    scales: {
+                        r: {
+                            angleLines: { color: 'rgba(88, 110, 117, 0.2)' },
+                            grid: { color: 'rgba(88, 110, 117, 0.2)' },
+                            pointLabels: { color: '#073642', font: { size: 12 } },
+                            suggestedMin: 0,
+                            suggestedMax: 10,
+                            ticks: { display: false }
+                        }
+                    }
+                }
+            });
+
+        });
+    </script>
+</body>
+</html>
